@@ -1,0 +1,16 @@
+# Maven derleme çıktıları
+target/
+
+# jpackage ve Inno Setup çıktıları
+dist/
+installer/Output/
+
+# Gizli bilgiler (e-posta adresi ve uygulama şifresi asla depoya girmez)
+.env
+
+# Editör ve işletim sistemi dosyaları
+.vscode/
+.idea/
+*.iml
+Thumbs.db
+.DS_Store
