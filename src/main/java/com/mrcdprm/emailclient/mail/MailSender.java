@@ -57,7 +57,6 @@ public final class MailSender {
     }
 
 
-
     /**
      * Virgül ya da noktalı virgülle ayrılmış adresleri çözümler. Geçersiz bir adres varsa hangisi olduğunu
      * söyleyen bir hata fırlatır.
