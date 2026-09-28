@@ -1,5 +1,6 @@
 package com.mrcdprm.emailclient.ui;
 
+import javafx.scene.layout.Region;
 import com.mrcdprm.emailclient.mail.MailAccount;
 import com.mrcdprm.emailclient.mail.MailReader;
 import com.mrcdprm.emailclient.mail.MailSender;
@@ -47,7 +48,7 @@ public final class AccountDialog extends Dialog<MailAccount> {
         setHeaderText("Hesabını ekle");
 
         final ButtonType connectType = new ButtonType("Bağlan", ButtonBar.ButtonData.OK_DONE);
-        getDialogPane().getButtonTypes().addAll(connectType, ButtonType.CANCEL);
+        getDialogPane().getButtonTypes().addAll(connectType, new ButtonType("İptal", ButtonBar.ButtonData.CANCEL_CLOSE));
         getDialogPane().getStylesheets().add(getClass().getResource("/com/mrcdprm/emailclient/app.css").toExternalForm());
 
         email.setPromptText("ornek@gmail.com");
@@ -88,6 +89,7 @@ public final class AccountDialog extends Dialog<MailAccount> {
         final Label note = new Label("Outlook / Hotmail hesapları Microsoft'un zorunlu kıldığı OAuth2 girişini "
                 + "gerektirdiği için bu sürümde desteklenmiyor.");
         note.setWrapText(true);
+        note.setMinHeight(Region.USE_PREF_SIZE); // uzun not kesilmesin, alt satıra geçsin
         note.getStyleClass().add("hint");
 
         error.getStyleClass().add("error");
