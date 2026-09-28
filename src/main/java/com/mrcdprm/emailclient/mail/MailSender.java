@@ -42,9 +42,10 @@ public final class MailSender {
         message.setText(draft.body() == null ? "" : draft.body(), "UTF-8");
         message.setSentDate(new Date());
         if (draft.inReplyTo() != null && !draft.inReplyTo().isBlank()) {
-            // E-posta programları bu başlıklarla yanıtları aynı konuşma altında gruplar
-            message.setHeader("In-Reply-To", draft.inReplyTo());
-            message.setHeader("References", draft.inReplyTo());
+            // Kimlik dışarıdan gelen bir e-postadan okunur: satır sonu başka başlık eklemesin diye temizlenir
+            final String inReplyTo = draft.inReplyTo().replaceAll("[\\r\\n]", "").strip();
+            message.setHeader("In-Reply-To", inReplyTo);
+            message.setHeader("References", inReplyTo);
         }
         Transport.send(message, account.email(), account.password());
     }

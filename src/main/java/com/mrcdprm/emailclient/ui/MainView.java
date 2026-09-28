@@ -299,6 +299,13 @@ public final class MainView extends BorderPane {
         final String folder = folders.getSelectionModel().getSelectedItem();
         if (message == null || folder == null)
             return;
+                if (Icons.forFolder(folder) == Feather.TRASH_2) {
+            final Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "Bu mesaj kalıcı olarak silinecek. Emin misin?", ButtonType.YES, ButtonType.NO);
+            confirm.initOwner(getScene().getWindow());
+            if (confirm.showAndWait().orElse(ButtonType.NO) != ButtonType.YES)
+                return;
+        }
         run("Siliniyor…", () -> {
             connected().delete(folder, message.uid());
             return null;
