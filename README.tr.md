@@ -110,6 +110,19 @@ $env:EMAIL_APP_PASSWORD = "uygulama şifren"
 mvn javafx:run
 ```
 
+### Kurulum dosyası oluşturma
+
+[Inno Setup 6](https://jrsoftware.org/isinfo.php) gerekir.
+
+```
+powershell -ExecutionPolicy Bypass -File installer\build.ps1
+ISCC installer\EmailClient.iss
+```
+
+`build.ps1` uygulamayı derler, gereken JDK modüllerini `jdeps` ile bulur ve `jpackage` ile içinde küçültülmüş bir Java çalışma ortamı bulunan `dist\EmailClient` klasörünü oluşturur. Kurulum dosyası `installer\Output\` klasöründe oluşur.
+
+**Yeni sürüm yayınlarken:** sürüm numarasını `pom.xml`, `EmailClientApp.VERSION`, `installer/build.ps1` ve `installer/EmailClient.iss` dosyalarında güncelle, testleri çalıştır, iki komutu çalıştır ve oluşan kurulum dosyasını yeni bir GitHub Release'e yükle.
+
 ## Öğrendiklerim
 
 - **E-posta aslında nasıl çalışıyor.** IMAP e-postaları sunucuda tutuyor ve bütün uygulamalar aynı kutuya bakıyor; benim uygulamamda okuduğum, sildiğim ya da işaretlediğim şeyin Gmail'de de görünmesinin sebebi bu. SMTP sadece gönderiyor. Mesajın değişen sıra numarasıyla sabit kalan UID'si arasındaki farkı ve `In-Reply-To` başlığının yanıtı aynı konuşmaya nasıl bağladığını öğrendim.

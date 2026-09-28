@@ -112,6 +112,19 @@ $env:EMAIL_APP_PASSWORD = "your app password"
 mvn javafx:run
 ```
 
+### Building the installer
+
+Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php).
+
+```
+powershell -ExecutionPolicy Bypass -File installer\build.ps1
+ISCC installer\EmailClient.iss
+```
+
+`build.ps1` builds the app, finds the JDK modules it needs with `jdeps` and uses `jpackage` to create `dist\EmailClient` with a trimmed Java runtime inside. The installer is created in `installer\Output\`.
+
+**When releasing a new version:** update the version in `pom.xml`, `EmailClientApp.VERSION`, `installer/build.ps1` and `installer/EmailClient.iss`, run the tests, run both commands and upload the installer to a new GitHub Release.
+
 ## What I Learned
 
 - **How email actually works.** IMAP keeps the mail on the server and every client looks at the same mailbox, which is why reading, deleting and marking in my app show up in Gmail too. SMTP only sends. I learned the difference between a message's changing sequence number and its stable UID, and how the `In-Reply-To` header puts a reply in the same conversation.
