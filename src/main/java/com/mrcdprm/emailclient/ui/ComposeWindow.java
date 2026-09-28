@@ -1,5 +1,6 @@
 package com.mrcdprm.emailclient.ui;
 
+import jakarta.mail.internet.AddressException;
 import atlantafx.base.theme.Styles;
 import com.mrcdprm.emailclient.mail.MailAccount;
 import com.mrcdprm.emailclient.mail.MailSender;
@@ -138,6 +139,15 @@ public final class ComposeWindow extends Stage {
         if (send.isDisabled())
             return;
         final MailSender.Draft draft = new MailSender.Draft(to.getText(), cc.getText(), subject.getText(), body.getText(), inReplyTo);
+        try {
+            // Önce alıcılar: adres yanlışsa konu hakkında boşuna soru sorulmasın
+            MailSender.parseRecipients(draft.to(), true);
+            MailSender.parseRecipients(draft.cc(), false);
+        } catch (AddressException e) {
+            error.setText(e.getMessage());
+            error.setVisible(true);
+            return;
+        }        
         if (draft.subject() == null || draft.subject().isBlank()) {
             final Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "Konu boş. Yine de gönderilsin mi?", ButtonType.YES, ButtonType.NO);
             confirm.initOwner(this);
