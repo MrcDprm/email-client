@@ -31,6 +31,13 @@
             <version>2.0.5</version>
         </dependency>
 
+        <!-- HTML e-postaları düz metne çevirme -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.23.2</version>
+        </dependency>
+
         <!-- Windows DPAPI ile şifre saklama -->
         <dependency>
             <groupId>net.java.dev.jna</groupId>
