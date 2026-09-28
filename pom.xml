@@ -24,6 +24,23 @@
             <version>${javafx.version}</version>
         </dependency>
 
+        <!-- Modern tema (AtlantaFX) ve simgeler (Ikonli + Feather) -->
+        <dependency>
+            <groupId>io.github.mkpaz</groupId>
+            <artifactId>atlantafx-base</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-javafx</artifactId>
+            <version>12.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-feather-pack</artifactId>
+            <version>12.4.0</version>
+        </dependency>
+
         <!-- E-posta: Jakarta Mail API + Eclipse Angus uygulaması (IMAP, SMTP) -->
         <dependency>
             <groupId>org.eclipse.angus</groupId>

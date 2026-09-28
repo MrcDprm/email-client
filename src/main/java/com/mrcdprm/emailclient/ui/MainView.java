@@ -1,5 +1,7 @@
 package com.mrcdprm.emailclient.ui;
 
+import atlantafx.base.controls.CustomTextField;
+import atlantafx.base.theme.Styles;
 import com.mrcdprm.emailclient.mail.MailAccount;
 import com.mrcdprm.emailclient.mail.MailReader;
 import com.mrcdprm.emailclient.mail.MessageSummary;
@@ -23,22 +25,28 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
 import javafx.scene.control.ToolBar;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Circle;
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 /**
- * Ana ekran: solda klasörler, ortada mesaj listesi, sağda okuma bölmesi.
+ * Ana ekran: solda hesap ve klasörler, ortada mesaj listesi, sağda okuma bölmesi.
  * Bütün IMAP işlemleri tek bir arka plan iş parçacığında sırayla çalışır; arayüz donmaz.
  */
 public final class MainView extends BorderPane {
 
     private static final int PAGE_SIZE = 30;
+    private static final Locale TURKISH = Locale.forLanguageTag("tr");
 
     private final MailAccount account;
     private final ExecutorService mailThread = Executors.newSingleThreadExecutor(runnable -> {
@@ -54,10 +62,14 @@ public final class MainView extends BorderPane {
     private final ListView<MessageSummary> messageList = new ListView<>(visibleMessages);
     private final Button loadMore = new Button("Daha fazla yükle");
     private final Label subject = new Label();
-    private final Label meta = new Label();
+    private final Avatar senderAvatar = new Avatar(40);
+    private final Label senderName = new Label();
+    private final Label senderMeta = new Label();
     private final TextArea body = new TextArea();
-    private final Button deleteButton = new Button("Sil");
-    private final Button unreadButton = new Button("Okunmadı yap");
+    private final VBox readerContent;
+    private final VBox readerEmpty;
+    private final Button deleteButton = iconButton(Feather.TRASH_2, "Sil (Delete)");
+    private final Button unreadButton = iconButton(Feather.MAIL, "Okunmadı yap");
     private final Label status = new Label();
     private final ProgressIndicator progress = new ProgressIndicator();
     private long shownUid = -1; // okuma bölmesinde gösterilmesi istenen son mesaj
@@ -67,27 +79,36 @@ public final class MainView extends BorderPane {
         this.account = account;
         getStyleClass().add("main-view");
 
-        final Button refresh = new Button("Yenile");
+        // Üst araç çubuğu
+        final Button refresh = iconButton(Feather.REFRESH_CW, "Yenile (F5)");
         refresh.setOnAction(e -> reloadMessages());
         deleteButton.setOnAction(e -> deleteSelected());
         unreadButton.setOnAction(e -> toggleSeen());
-        final TextField search = new TextField();
+        final CustomTextField search = new CustomTextField();
         search.setPromptText("Yüklenen mesajlarda ara");
+        search.setLeft(Icons.of(Feather.SEARCH));
+        search.setPrefWidth(260);
         search.textProperty().addListener((obs, old, text) -> filter(text));
         final Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         setTop(new ToolBar(refresh, deleteButton, unreadButton, spacer, search));
 
-        folders.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(String name, boolean empty) {
-                super.updateItem(name, empty);
-                setText(empty || name == null ? null : Formats.folderName(name));
-            }
-        });
+        // Sol: hesap ve klasörler
+        final Avatar accountAvatar = new Avatar(36);
+        accountAvatar.set(account.email(), account.email());
+        final Label accountLabel = new Label(account.email());
+        accountLabel.getStyleClass().add("account-label");
+        final HBox accountBox = new HBox(10, accountAvatar, accountLabel);
+        accountBox.setAlignment(Pos.CENTER_LEFT);
+        accountBox.setPadding(new Insets(14, 12, 10, 12));
+        folders.setCellFactory(list -> new FolderCell());
         folders.getSelectionModel().selectedItemProperty().addListener((obs, old, folder) -> reloadMessages());
-        folders.setPrefWidth(190);
+        folders.getStyleClass().add("folder-list");
+        final VBox sidebar = new VBox(accountBox, folders);
+        sidebar.getStyleClass().add("sidebar");
+        VBox.setVgrow(folders, Priority.ALWAYS);
 
+        // Orta: mesaj listesi
         messageList.setCellFactory(list -> new MessageCell());
         messageList.setPlaceholder(new Label("Bu klasörde mesaj yok."));
         messageList.getSelectionModel().selectedItemProperty().addListener((obs, old, message) -> {
@@ -95,31 +116,45 @@ public final class MainView extends BorderPane {
                 showMessage(message);
         });
         loadMore.setMaxWidth(Double.MAX_VALUE);
+        loadMore.getStyleClass().add(Styles.FLAT);
         loadMore.setOnAction(e -> loadPage(messages.size()));
         loadMore.setVisible(false);
         loadMore.managedProperty().bind(loadMore.visibleProperty());
         final VBox listPane = new VBox(messageList, loadMore);
         VBox.setVgrow(messageList, Priority.ALWAYS);
 
+        // Sağ: okuma bölmesi (seçim yoksa boş durum)
         subject.getStyleClass().add("reader-subject");
         subject.setWrapText(true);
-        meta.getStyleClass().add("hint");
+        senderName.getStyleClass().add("sender-name");
+        senderMeta.getStyleClass().add("hint");
+        final HBox senderBox = new HBox(10, senderAvatar, new VBox(2, senderName, senderMeta));
+        senderBox.setAlignment(Pos.CENTER_LEFT);
         body.setEditable(false); // metin seçilip kopyalanabilir ama değiştirilemez
         body.setWrapText(true);
-        final VBox readerPane = new VBox(6, subject, meta, body);
-        readerPane.setPadding(new Insets(10));
+        body.getStyleClass().add("reader-body");
+        readerContent = new VBox(14, subject, senderBox, body);
+        readerContent.setPadding(new Insets(20, 24, 20, 24));
         VBox.setVgrow(body, Priority.ALWAYS);
+        final FontIcon emptyIcon = Icons.of(Feather.MAIL);
+        emptyIcon.getStyleClass().add("empty-icon");
+        readerEmpty = new VBox(10, emptyIcon, new Label("Okumak için bir mesaj seç"));
+        readerEmpty.setAlignment(Pos.CENTER);
+        readerEmpty.getStyleClass().add("hint");
+        final StackPane readerPane = new StackPane(readerEmpty, readerContent);
+        readerPane.getStyleClass().add("reader");
 
-        final SplitPane split = new SplitPane(folders, listPane, readerPane);
-        split.setDividerPositions(0.18, 0.52);
-        SplitPane.setResizableWithParent(folders, false);
+        final SplitPane split = new SplitPane(sidebar, listPane, readerPane);
+        split.setDividerPositions(0.2, 0.52);
+        SplitPane.setResizableWithParent(sidebar, false);
         setCenter(split);
 
-        progress.setMaxSize(16, 16);
+        // Alt: durum çubuğu
+        progress.setMaxSize(14, 14);
         progress.setVisible(false);
         final HBox statusBar = new HBox(8, progress, status);
         statusBar.setAlignment(Pos.CENTER_LEFT);
-        statusBar.setPadding(new Insets(4, 8, 4, 8));
+        statusBar.getStyleClass().add("status-bar");
         setBottom(statusBar);
 
         setOnKeyPressed(event -> {
@@ -129,7 +164,7 @@ public final class MainView extends BorderPane {
                 deleteSelected();
         });
 
-        updateButtons(null);
+        showMessage(null);
         loadFolders();
     }
 
@@ -146,11 +181,17 @@ public final class MainView extends BorderPane {
         mailThread.shutdown();
     }
 
+    private static Button iconButton(Ikon icon, String tooltip) {
+        final Button button = new Button(null, Icons.of(icon));
+        button.getStyleClass().addAll(Styles.BUTTON_ICON, Styles.FLAT);
+        button.setTooltip(new Tooltip(tooltip));
+        return button;
+    }
+
     private void loadFolders() {
         run("Klasörler yükleniyor…", () -> connected().folderNames(), names -> {
             folders.getItems().setAll(names);
             folders.getSelectionModel().select(0); // INBOX
-            status.setText(account.email());
         });
     }
 
@@ -168,22 +209,23 @@ public final class MainView extends BorderPane {
                 return; // bu arada başka klasöre geçildi
             messages.addAll(page);
             loadMore.setVisible(page.size() == PAGE_SIZE);
-            status.setText(Formats.folderName(folder) + ": " + messages.size() + " mesaj yüklendi");
+            status.setText(Formats.folderName(folder) + " · " + messages.size() + " mesaj");
         });
     }
 
     private void showMessage(MessageSummary message) {
         updateButtons(message);
-        if (message == null) {
-            subject.setText("");
-            meta.setText("");
-            body.clear();
+        readerContent.setVisible(message != null);
+        readerEmpty.setVisible(message == null);
+        if (message == null)
             return;
-        }
+
         shownUid = message.uid();
         subject.setText(message.subject());
-        meta.setText(message.from() + (message.fromAddress() == null ? "" : " <" + message.fromAddress() + ">")
-                + "   " + Formats.longDate(message.date()));
+        senderAvatar.set(message.from(), message.fromAddress());
+        senderName.setText(message.from());
+        senderMeta.setText((message.fromAddress() == null ? "" : message.fromAddress() + " · ")
+                + Formats.longDate(message.date()));
         body.setText("Yükleniyor…");
         final String folder = folders.getSelectionModel().getSelectedItem();
         run(null, () -> connected().readBody(folder, message.uid()), text -> {
@@ -236,16 +278,18 @@ public final class MainView extends BorderPane {
     }
 
     private void filter(String text) {
-        final String query = text == null ? "" : text.strip().toLowerCase(Locale.forLanguageTag("tr"));
+        final String query = text == null ? "" : text.strip().toLowerCase(TURKISH);
         visibleMessages.setPredicate(query.isEmpty() ? null : message ->
-                message.subject().toLowerCase(Locale.forLanguageTag("tr")).contains(query)
-                || message.from().toLowerCase(Locale.forLanguageTag("tr")).contains(query));
+                message.subject().toLowerCase(TURKISH).contains(query)
+                || message.from().toLowerCase(TURKISH).contains(query));
     }
 
     private void updateButtons(MessageSummary message) {
         deleteButton.setDisable(message == null);
         unreadButton.setDisable(message == null);
-        unreadButton.setText(message != null && !message.seen() ? "Okundu yap" : "Okunmadı yap");
+        final boolean unread = message != null && !message.seen();
+        unreadButton.setGraphic(Icons.of(unread ? Feather.CHECK_CIRCLE : Feather.MAIL));
+        unreadButton.getTooltip().setText(unread ? "Okundu yap" : "Okunmadı yap");
     }
 
     /** Bağlantı yoksa ya da sunucu kapattıysa yeniden bağlanır. Sadece mailThread içinden çağrılır. */
@@ -282,18 +326,41 @@ public final class MainView extends BorderPane {
         mailThread.submit(task);
     }
 
-    /** Mesaj listesindeki bir satır: gönderen, konu ve tarih; okunmamışlar kalın. */
+    /** Klasör satırı: simge ve okunabilir ad. */
+    private static final class FolderCell extends ListCell<String> {
+        @Override
+        protected void updateItem(String name, boolean empty) {
+            super.updateItem(name, empty);
+            if (empty || name == null) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+            setText(Formats.folderName(name));
+            setGraphic(Icons.of(Icons.forFolder(name)));
+        }
+    }
+
+    /** Mesaj satırı: avatar, gönderen, tarih, konu; okunmamışlar kalın ve mavi noktalı. */
     private static final class MessageCell extends ListCell<MessageSummary> {
+        private final Avatar avatar = new Avatar(34);
         private final Label from = new Label();
         private final Label date = new Label();
         private final Label subjectLabel = new Label();
-        private final VBox content;
+        private final Circle unreadDot = new Circle(4);
+        private final HBox content;
 
         MessageCell() {
             final Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             date.getStyleClass().add("hint");
-            content = new VBox(2, new HBox(6, from, spacer, date), subjectLabel);
+            subjectLabel.getStyleClass().add("subject-line");
+            unreadDot.getStyleClass().add("unread-dot");
+            final VBox text = new VBox(3, new HBox(6, from, spacer, date), subjectLabel);
+            HBox.setHgrow(text, Priority.ALWAYS);
+            content = new HBox(10, unreadDot, avatar, text);
+            content.setAlignment(Pos.CENTER_LEFT);
+            content.getStyleClass().add("message-cell");
         }
 
         @Override
@@ -303,9 +370,11 @@ public final class MainView extends BorderPane {
                 setGraphic(null);
                 return;
             }
+            avatar.set(message.from(), message.fromAddress());
             from.setText(message.from());
             subjectLabel.setText(message.subject());
             date.setText(Formats.shortDate(message.date(), ZoneId.systemDefault(), LocalDate.now()));
+            unreadDot.setVisible(!message.seen());
             content.getStyleClass().remove("unread");
             if (!message.seen())
                 content.getStyleClass().add("unread");

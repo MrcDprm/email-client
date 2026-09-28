@@ -1,23 +1,103 @@
-/* Uygulamanın ortak görünümü */
+/* Uygulamanın ortak görünümü. Renkler AtlantaFX temasının değişkenlerinden gelir (-color-...). */
 .root {
     -fx-font-size: 13px;
 }
 
 .error {
-    -fx-text-fill: #c62828;
+    -fx-text-fill: -color-danger-fg;
 }
 
 .hint {
-    -fx-text-fill: #6b7280;
+    -fx-text-fill: -color-fg-muted;
     -fx-font-size: 11px;
 }
 
-/* Ana ekran */
-.unread .label {
+/* Avatar */
+.avatar-initial {
+    -fx-text-fill: white;
     -fx-font-weight: bold;
 }
 
-.reader-subject {
-    -fx-font-size: 17px;
+/* Sol kenar çubuğu */
+.sidebar {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.sidebar .folder-list {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+}
+
+.sidebar .folder-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 8 12 8 14;
+    -fx-graphic-text-gap: 10;
+}
+
+.sidebar .folder-list .list-cell:selected {
+    -fx-background-color: -color-accent-subtle;
+    -fx-text-fill: -color-accent-fg;
     -fx-font-weight: bold;
+}
+
+.sidebar .folder-list .list-cell:selected .ikonli-font-icon {
+    -fx-icon-color: -color-accent-fg;
+}
+
+.account-label {
+    -fx-font-weight: bold;
+}
+
+/* Mesaj listesi */
+.message-cell {
+    -fx-padding: 6 4 6 0;
+}
+
+.message-cell .subject-line {
+    -fx-text-fill: -color-fg-muted;
+}
+
+.message-cell.unread .label {
+    -fx-font-weight: bold;
+}
+
+.message-cell.unread .subject-line {
+    -fx-text-fill: -color-fg-default;
+}
+
+.unread-dot {
+    -fx-fill: -color-accent-emphasis;
+}
+
+/* Okuma bölmesi */
+.reader {
+    -fx-background-color: -color-bg-default;
+}
+
+.reader-subject {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.sender-name {
+    -fx-font-weight: bold;
+}
+
+.reader-body,
+.reader-body .content {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-font-size: 14px;
+}
+
+.empty-icon {
+    -fx-icon-size: 48px;
+    -fx-icon-color: -color-fg-subtle;
+}
+
+/* Durum çubuğu */
+.status-bar {
+    -fx-padding: 4 10 4 10;
+    -fx-border-color: -color-border-default transparent transparent transparent;
+    -fx-font-size: 11px;
 }

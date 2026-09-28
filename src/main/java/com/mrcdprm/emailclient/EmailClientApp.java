@@ -1,5 +1,6 @@
 package com.mrcdprm.emailclient;
 
+import atlantafx.base.theme.PrimerLight;
 import com.mrcdprm.emailclient.mail.MailAccount;
 import com.mrcdprm.emailclient.settings.AccountStore;
 import com.mrcdprm.emailclient.ui.AccountDialog;
@@ -19,6 +20,7 @@ public class EmailClientApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet()); // modern tema        
         final AccountStore store = new AccountStore(AccountStore.defaultDirectory());
 
         // Önce ortam değişkenleri (geliştirme), sonra kayıtlı hesap, ikisi de yoksa kurulum penceresi
