@@ -95,6 +95,30 @@
     -fx-icon-color: -color-fg-subtle;
 }
 
+/* Mesaj yazma ve Hakkında */
+.compose-body {
+    -fx-font-size: 14px;
+}
+
+.about-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+/* AtlantaFX araç çubuğundaki düğmeleri düz gösterir; "Yeni mesaj" her zaman mavi kalsın */
+.tool-bar .button.accent {
+    -fx-background-color: -color-accent-emphasis;
+    -fx-text-fill: -color-fg-emphasis;
+}
+
+.tool-bar .button.accent:hover {
+    -fx-background-color: -color-accent-8;
+}
+
+.tool-bar .button.accent .ikonli-font-icon {
+    -fx-icon-color: -color-fg-emphasis;
+}
+
 /* Durum çubuğu */
 .status-bar {
     -fx-padding: 4 10 4 10;

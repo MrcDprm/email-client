@@ -2,6 +2,7 @@ package com.mrcdprm.emailclient.ui;
 
 import atlantafx.base.controls.CustomTextField;
 import atlantafx.base.theme.Styles;
+import atlantafx.base.theme.Tweaks;
 import com.mrcdprm.emailclient.mail.MailAccount;
 import com.mrcdprm.emailclient.mail.MailReader;
 import com.mrcdprm.emailclient.mail.MessageSummary;
@@ -17,12 +18,19 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Separator;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.ToolBar;
@@ -68,20 +76,30 @@ public final class MainView extends BorderPane {
     private final TextArea body = new TextArea();
     private final VBox readerContent;
     private final VBox readerEmpty;
+    private final Button replyButton = iconButton(Feather.CORNER_UP_LEFT, "Yanıtla (Ctrl+R)");
+    private final Button forwardButton = iconButton(Feather.CORNER_UP_RIGHT, "İlet");
     private final Button deleteButton = iconButton(Feather.TRASH_2, "Sil (Delete)");
     private final Button unreadButton = iconButton(Feather.MAIL, "Okunmadı yap");
+    private final FontIcon unreadIcon = (FontIcon) unreadButton.getGraphic();    
     private final Label status = new Label();
     private final ProgressIndicator progress = new ProgressIndicator();
     private long shownUid = -1; // okuma bölmesinde gösterilmesi istenen son mesaj
+    private String shownBody; // okuma bölmesindeki mesajın gövdesi (yüklenince dolar; yanıt / iletme için)
     private boolean replacing; // listedeki satır güncellenirken seçim olayları yok sayılır
 
-    public MainView(MailAccount account) {
+    public MainView(MailAccount account, Consumer<String> openUrl, Runnable onLogout) {
         this.account = account;
         getStyleClass().add("main-view");
 
         // Üst araç çubuğu
+        final Button compose = new Button("Yeni mesaj", Icons.of(Feather.EDIT));
+        compose.getStyleClass().add(Styles.ACCENT);
+        compose.setTooltip(new Tooltip("Yeni mesaj (Ctrl+N)"));
+        compose.setOnAction(e -> openCompose(null, false));
         final Button refresh = iconButton(Feather.REFRESH_CW, "Yenile (F5)");
         refresh.setOnAction(e -> reloadMessages());
+        replyButton.setOnAction(e -> openCompose(messageList.getSelectionModel().getSelectedItem(), false));
+        forwardButton.setOnAction(e -> openCompose(messageList.getSelectionModel().getSelectedItem(), true));
         deleteButton.setOnAction(e -> deleteSelected());
         unreadButton.setOnAction(e -> toggleSeen());
         final CustomTextField search = new CustomTextField();
@@ -89,9 +107,16 @@ public final class MainView extends BorderPane {
         search.setLeft(Icons.of(Feather.SEARCH));
         search.setPrefWidth(260);
         search.textProperty().addListener((obs, old, text) -> filter(text));
+        final MenuItem about = new MenuItem("Hakkında", Icons.of(Feather.INFO));
+        about.setOnAction(e -> new AboutDialog(getScene().getWindow(), openUrl).showAndWait());
+        final MenuItem logout = new MenuItem("Hesaptan çık", Icons.of(Feather.LOG_OUT));
+        logout.setOnAction(e -> confirmLogout(onLogout));
+        final MenuButton menu = new MenuButton(null, Icons.of(Feather.MORE_VERTICAL), about, new SeparatorMenuItem(), logout);
+        menu.getStyleClass().addAll(Styles.BUTTON_ICON, Styles.FLAT, Tweaks.NO_ARROW);
         final Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        setTop(new ToolBar(refresh, deleteButton, unreadButton, spacer, search));
+        setTop(new ToolBar(compose, new Separator(Orientation.VERTICAL), refresh, replyButton, forwardButton,
+                deleteButton, unreadButton, spacer, search, menu));
 
         // Sol: hesap ve klasörler
         final Avatar accountAvatar = new Avatar(36);
@@ -162,6 +187,10 @@ public final class MainView extends BorderPane {
                 reloadMessages();
             else if (event.getCode() == KeyCode.DELETE && messageList.isFocused())
                 deleteSelected();
+            else if (event.isShortcutDown() && event.getCode() == KeyCode.N)
+                openCompose(null, false);
+            else if (event.isShortcutDown() && event.getCode() == KeyCode.R && !replyButton.isDisabled())
+                openCompose(messageList.getSelectionModel().getSelectedItem(), false);
         });
 
         showMessage(null);
@@ -180,6 +209,31 @@ public final class MainView extends BorderPane {
         });
         mailThread.shutdown();
     }
+
+    /** original null ise yeni mesaj, değilse yanıt ya da iletme penceresi açar. */
+    private void openCompose(MessageSummary original, boolean forward) {
+        final Consumer<String> onSent = message -> {
+            status.getStyleClass().remove("error");
+            status.setText(message);
+        };
+        final ComposeWindow window;
+        if (original == null)
+            window = ComposeWindow.newMessage(getScene().getWindow(), account, onSent);
+        else if (forward)
+            window = ComposeWindow.forward(getScene().getWindow(), account, original, shownBody, onSent);
+        else
+            window = ComposeWindow.reply(getScene().getWindow(), account, original, shownBody, onSent);
+        window.show();
+    }
+
+    private void confirmLogout(Runnable onLogout) {
+        final Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Hesaptan çıkılsın mı? Kayıtlı şifre bu bilgisayardan silinecek.", ButtonType.YES, ButtonType.NO);
+        confirm.initOwner(getScene().getWindow());
+        if (confirm.showAndWait().orElse(ButtonType.NO) == ButtonType.YES)
+            onLogout.run();
+    }
+
 
     private static Button iconButton(Ikon icon, String tooltip) {
         final Button button = new Button(null, Icons.of(icon));
@@ -214,6 +268,7 @@ public final class MainView extends BorderPane {
     }
 
     private void showMessage(MessageSummary message) {
+        shownBody = null;
         updateButtons(message);
         readerContent.setVisible(message != null);
         readerEmpty.setVisible(message == null);
@@ -231,8 +286,10 @@ public final class MainView extends BorderPane {
         run(null, () -> connected().readBody(folder, message.uid()), text -> {
             if (shownUid != message.uid())
                 return; // kullanıcı bu arada başka mesaja tıkladı
+            shownBody = text;
             body.setText(text);
             body.positionCaret(0);
+            updateButtons(message);
             replace(message, true);
         });
     }
@@ -285,10 +342,13 @@ public final class MainView extends BorderPane {
     }
 
     private void updateButtons(MessageSummary message) {
+        // Yanıt ve iletme, gövde yüklenince açılır (alıntı için gövde gerekli)
+        replyButton.setDisable(message == null || shownBody == null);
+        forwardButton.setDisable(message == null || shownBody == null);
         deleteButton.setDisable(message == null);
         unreadButton.setDisable(message == null);
         final boolean unread = message != null && !message.seen();
-        unreadButton.setGraphic(Icons.of(unread ? Feather.CHECK_CIRCLE : Feather.MAIL));
+        unreadIcon.setIconCode(unread ? Feather.CHECK_CIRCLE : Feather.MAIL); // yeni nesne yok, sadece şekil değişir
         unreadButton.getTooltip().setText(unread ? "Okundu yap" : "Okunmadı yap");
     }
 
