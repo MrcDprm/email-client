@@ -1,5 +1,6 @@
 package com.mrcdprm.emailclient.mail;
 
+import jakarta.mail.Address;
 import jakarta.mail.FetchProfile;
 import jakarta.mail.Flags;
 import jakarta.mail.Folder;
@@ -8,6 +9,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.Store;
 import jakarta.mail.UIDFolder;
 import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.internet.MimeUtility;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -64,6 +66,7 @@ public final class MailReader implements AutoCloseable {
         profile.add(FetchProfile.Item.ENVELOPE);
         profile.add(FetchProfile.Item.FLAGS);
         profile.add(UIDFolder.FetchProfileItem.UID);
+        profile.add("Message-ID");
         folder.fetch(messages, profile);
 
         final UIDFolder uids = (UIDFolder) folder;
@@ -72,9 +75,11 @@ public final class MailReader implements AutoCloseable {
             result.add(new MessageSummary(
                     uids.getUID(message),
                     sender(message),
+                    replyAddress(message),
                     message.getSubject() == null || message.getSubject().isBlank() ? "(Konu yok)" : message.getSubject(),
                     message.getSentDate() == null ? null : message.getSentDate().toInstant(),
-                    message.isSet(Flags.Flag.SEEN)));
+                    message.isSet(Flags.Flag.SEEN),
+                    message instanceof MimeMessage mime ? mime.getMessageID() : null));
         }
         return result;
     }
@@ -146,6 +151,15 @@ public final class MailReader implements AutoCloseable {
         }
         return decode(message.getFrom()[0].toString());
     }
+    
+    /** Yanıtın gideceği adres: varsa Reply-To, yoksa gönderen. */
+    private static String replyAddress(Message message) throws MessagingException {
+        final Address[] replyTo = message.getReplyTo();
+        if (replyTo != null && replyTo.length > 0 && replyTo[0] instanceof InternetAddress address)
+            return address.getAddress();
+        return null;
+    }
+
 
     private static String decode(String text) {
         try {
