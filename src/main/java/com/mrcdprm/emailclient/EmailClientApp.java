@@ -3,13 +3,13 @@ package com.mrcdprm.emailclient;
 import com.mrcdprm.emailclient.mail.MailAccount;
 import com.mrcdprm.emailclient.settings.AccountStore;
 import com.mrcdprm.emailclient.ui.AccountDialog;
+import com.mrcdprm.emailclient.ui.MainView;
 import java.io.IOException;
 import java.util.Optional;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
-import javafx.scene.control.Label;
 import javafx.stage.Stage;
 
 public class EmailClientApp extends Application {
@@ -37,9 +37,14 @@ public class EmailClientApp extends Application {
             }
         }
 
+        final MainView mainView = new MainView(account.get());
+        final Scene scene = new Scene(mainView, 1100, 720);
+        scene.getStylesheets().add(getClass().getResource("/com/mrcdprm/emailclient/app.css").toExternalForm());
         stage.setTitle("Email Client - " + account.get().email());
-        stage.setScene(new Scene(new Label("Bağlandı: " + account.get().email()), 1000, 700));
+        stage.setScene(scene);
+        stage.setOnHidden(e -> mainView.shutdown());
         stage.show();
+
     }
 
     public static void main(String[] args) {

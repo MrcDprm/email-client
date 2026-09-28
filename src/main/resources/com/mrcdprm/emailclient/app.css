@@ -11,3 +11,13 @@
     -fx-text-fill: #6b7280;
     -fx-font-size: 11px;
 }
+
+/* Ana ekran */
+.unread .label {
+    -fx-font-weight: bold;
+}
+
+.reader-subject {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+}

@@ -107,6 +107,11 @@ public final class MailReader implements AutoCloseable {
         folder.expunge();
     }
 
+    /** Bağlantı hâlâ açık mı (sunucu zaman aşımıyla kapatmış olabilir). */
+    public boolean isConnected() {
+        return store.isConnected();
+    }
+
     @Override
     public void close() throws MessagingException {
         store.close(); // açık klasörler de kapanır
@@ -151,7 +156,7 @@ public final class MailReader implements AutoCloseable {
         }
         return decode(message.getFrom()[0].toString());
     }
-    
+
     /** Yanıtın gideceği adres: varsa Reply-To, yoksa gönderen. */
     private static String replyAddress(Message message) throws MessagingException {
         final Address[] replyTo = message.getReplyTo();

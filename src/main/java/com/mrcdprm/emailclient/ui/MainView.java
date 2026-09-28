@@ -1,0 +1,315 @@
+package com.mrcdprm.emailclient.ui;
+
+import com.mrcdprm.emailclient.mail.MailAccount;
+import com.mrcdprm.emailclient.mail.MailReader;
+import com.mrcdprm.emailclient.mail.MessageSummary;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Locale;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ToolBar;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+
+/**
+ * Ana ekran: solda klasörler, ortada mesaj listesi, sağda okuma bölmesi.
+ * Bütün IMAP işlemleri tek bir arka plan iş parçacığında sırayla çalışır; arayüz donmaz.
+ */
+public final class MainView extends BorderPane {
+
+    private static final int PAGE_SIZE = 30;
+
+    private final MailAccount account;
+    private final ExecutorService mailThread = Executors.newSingleThreadExecutor(runnable -> {
+        final Thread thread = new Thread(runnable, "imap");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private MailReader reader; // sadece mailThread içinde kullanılır
+
+    private final ListView<String> folders = new ListView<>();
+    private final ObservableList<MessageSummary> messages = FXCollections.observableArrayList();
+    private final FilteredList<MessageSummary> visibleMessages = new FilteredList<>(messages);
+    private final ListView<MessageSummary> messageList = new ListView<>(visibleMessages);
+    private final Button loadMore = new Button("Daha fazla yükle");
+    private final Label subject = new Label();
+    private final Label meta = new Label();
+    private final TextArea body = new TextArea();
+    private final Button deleteButton = new Button("Sil");
+    private final Button unreadButton = new Button("Okunmadı yap");
+    private final Label status = new Label();
+    private final ProgressIndicator progress = new ProgressIndicator();
+    private long shownUid = -1; // okuma bölmesinde gösterilmesi istenen son mesaj
+    private boolean replacing; // listedeki satır güncellenirken seçim olayları yok sayılır
+
+    public MainView(MailAccount account) {
+        this.account = account;
+        getStyleClass().add("main-view");
+
+        final Button refresh = new Button("Yenile");
+        refresh.setOnAction(e -> reloadMessages());
+        deleteButton.setOnAction(e -> deleteSelected());
+        unreadButton.setOnAction(e -> toggleSeen());
+        final TextField search = new TextField();
+        search.setPromptText("Yüklenen mesajlarda ara");
+        search.textProperty().addListener((obs, old, text) -> filter(text));
+        final Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        setTop(new ToolBar(refresh, deleteButton, unreadButton, spacer, search));
+
+        folders.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(String name, boolean empty) {
+                super.updateItem(name, empty);
+                setText(empty || name == null ? null : Formats.folderName(name));
+            }
+        });
+        folders.getSelectionModel().selectedItemProperty().addListener((obs, old, folder) -> reloadMessages());
+        folders.setPrefWidth(190);
+
+        messageList.setCellFactory(list -> new MessageCell());
+        messageList.setPlaceholder(new Label("Bu klasörde mesaj yok."));
+        messageList.getSelectionModel().selectedItemProperty().addListener((obs, old, message) -> {
+            if (!replacing)
+                showMessage(message);
+        });
+        loadMore.setMaxWidth(Double.MAX_VALUE);
+        loadMore.setOnAction(e -> loadPage(messages.size()));
+        loadMore.setVisible(false);
+        loadMore.managedProperty().bind(loadMore.visibleProperty());
+        final VBox listPane = new VBox(messageList, loadMore);
+        VBox.setVgrow(messageList, Priority.ALWAYS);
+
+        subject.getStyleClass().add("reader-subject");
+        subject.setWrapText(true);
+        meta.getStyleClass().add("hint");
+        body.setEditable(false); // metin seçilip kopyalanabilir ama değiştirilemez
+        body.setWrapText(true);
+        final VBox readerPane = new VBox(6, subject, meta, body);
+        readerPane.setPadding(new Insets(10));
+        VBox.setVgrow(body, Priority.ALWAYS);
+
+        final SplitPane split = new SplitPane(folders, listPane, readerPane);
+        split.setDividerPositions(0.18, 0.52);
+        SplitPane.setResizableWithParent(folders, false);
+        setCenter(split);
+
+        progress.setMaxSize(16, 16);
+        progress.setVisible(false);
+        final HBox statusBar = new HBox(8, progress, status);
+        statusBar.setAlignment(Pos.CENTER_LEFT);
+        statusBar.setPadding(new Insets(4, 8, 4, 8));
+        setBottom(statusBar);
+
+        setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.F5)
+                reloadMessages();
+            else if (event.getCode() == KeyCode.DELETE && messageList.isFocused())
+                deleteSelected();
+        });
+
+        updateButtons(null);
+        loadFolders();
+    }
+
+    /** Pencere kapanırken bağlantıyı kapatır. */
+    public void shutdown() {
+        mailThread.submit(() -> {
+            try {
+                if (reader != null)
+                    reader.close();
+            } catch (Exception ignored) {
+                // kapanışta hata önemli değil
+            }
+        });
+        mailThread.shutdown();
+    }
+
+    private void loadFolders() {
+        run("Klasörler yükleniyor…", () -> connected().folderNames(), names -> {
+            folders.getItems().setAll(names);
+            folders.getSelectionModel().select(0); // INBOX
+            status.setText(account.email());
+        });
+    }
+
+    private void reloadMessages() {
+        messages.clear();
+        loadPage(0);
+    }
+
+    private void loadPage(int skip) {
+        final String folder = folders.getSelectionModel().getSelectedItem();
+        if (folder == null)
+            return;
+        run("Mesajlar yükleniyor…", () -> connected().list(folder, skip, PAGE_SIZE), page -> {
+            if (!folder.equals(folders.getSelectionModel().getSelectedItem()))
+                return; // bu arada başka klasöre geçildi
+            messages.addAll(page);
+            loadMore.setVisible(page.size() == PAGE_SIZE);
+            status.setText(Formats.folderName(folder) + ": " + messages.size() + " mesaj yüklendi");
+        });
+    }
+
+    private void showMessage(MessageSummary message) {
+        updateButtons(message);
+        if (message == null) {
+            subject.setText("");
+            meta.setText("");
+            body.clear();
+            return;
+        }
+        shownUid = message.uid();
+        subject.setText(message.subject());
+        meta.setText(message.from() + (message.fromAddress() == null ? "" : " <" + message.fromAddress() + ">")
+                + "   " + Formats.longDate(message.date()));
+        body.setText("Yükleniyor…");
+        final String folder = folders.getSelectionModel().getSelectedItem();
+        run(null, () -> connected().readBody(folder, message.uid()), text -> {
+            if (shownUid != message.uid())
+                return; // kullanıcı bu arada başka mesaja tıkladı
+            body.setText(text);
+            body.positionCaret(0);
+            replace(message, true);
+        });
+    }
+
+    private void deleteSelected() {
+        final MessageSummary message = messageList.getSelectionModel().getSelectedItem();
+        final String folder = folders.getSelectionModel().getSelectedItem();
+        if (message == null || folder == null)
+            return;
+        run("Siliniyor…", () -> {
+            connected().delete(folder, message.uid());
+            return null;
+        }, ignored -> {
+            messages.remove(message);
+            status.setText("Mesaj silindi.");
+        });
+    }
+
+    private void toggleSeen() {
+        final MessageSummary message = messageList.getSelectionModel().getSelectedItem();
+        final String folder = folders.getSelectionModel().getSelectedItem();
+        if (message == null || folder == null)
+            return;
+        final boolean seen = !message.seen();
+        run(null, () -> {
+            connected().setSeen(folder, message.uid(), seen);
+            return null;
+        }, ignored -> replace(message, seen));
+    }
+
+    /** Listedeki mesajı yeni "okundu" durumuyla değiştirir (record değiştirilemediği için yenisi oluşturulur). */
+    private void replace(MessageSummary message, boolean seen) {
+        final int index = messages.indexOf(message);
+        if (index < 0 || message.seen() == seen)
+            return;
+        final MessageSummary updated = new MessageSummary(message.uid(), message.from(), message.fromAddress(),
+                message.subject(), message.date(), seen, message.messageId());
+        replacing = true;
+        messages.set(index, updated);
+        messageList.getSelectionModel().select(updated);
+        replacing = false;
+        updateButtons(updated);
+    }
+
+    private void filter(String text) {
+        final String query = text == null ? "" : text.strip().toLowerCase(Locale.forLanguageTag("tr"));
+        visibleMessages.setPredicate(query.isEmpty() ? null : message ->
+                message.subject().toLowerCase(Locale.forLanguageTag("tr")).contains(query)
+                || message.from().toLowerCase(Locale.forLanguageTag("tr")).contains(query));
+    }
+
+    private void updateButtons(MessageSummary message) {
+        deleteButton.setDisable(message == null);
+        unreadButton.setDisable(message == null);
+        unreadButton.setText(message != null && !message.seen() ? "Okundu yap" : "Okunmadı yap");
+    }
+
+    /** Bağlantı yoksa ya da sunucu kapattıysa yeniden bağlanır. Sadece mailThread içinden çağrılır. */
+    private MailReader connected() throws Exception {
+        if (reader == null || !reader.isConnected())
+            reader = MailReader.connect(account);
+        return reader;
+    }
+
+    /** İşi arka planda çalıştırır; sonucu arayüz iş parçacığında onSuccess'e verir, hatayı durum çubuğunda gösterir. */
+    private <T> void run(String busyText, Callable<T> work, Consumer<T> onSuccess) {
+        final Task<T> task = new Task<>() {
+            @Override
+            protected T call() throws Exception {
+                return work.call();
+            }
+        };
+        task.setOnSucceeded(e -> {
+            progress.setVisible(false);
+            status.getStyleClass().remove("error");
+            onSuccess.accept(task.getValue());
+        });
+        task.setOnFailed(e -> {
+            progress.setVisible(false);
+            if (!status.getStyleClass().contains("error"))
+                status.getStyleClass().add("error");
+            status.setText(ErrorMessages.of(task.getException()));
+        });
+        if (busyText != null) {
+            status.getStyleClass().remove("error");
+            status.setText(busyText);
+        }
+        progress.setVisible(true);
+        mailThread.submit(task);
+    }
+
+    /** Mesaj listesindeki bir satır: gönderen, konu ve tarih; okunmamışlar kalın. */
+    private static final class MessageCell extends ListCell<MessageSummary> {
+        private final Label from = new Label();
+        private final Label date = new Label();
+        private final Label subjectLabel = new Label();
+        private final VBox content;
+
+        MessageCell() {
+            final Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            date.getStyleClass().add("hint");
+            content = new VBox(2, new HBox(6, from, spacer, date), subjectLabel);
+        }
+
+        @Override
+        protected void updateItem(MessageSummary message, boolean empty) {
+            super.updateItem(message, empty);
+            if (empty || message == null) {
+                setGraphic(null);
+                return;
+            }
+            from.setText(message.from());
+            subjectLabel.setText(message.subject());
+            date.setText(Formats.shortDate(message.date(), ZoneId.systemDefault(), LocalDate.now()));
+            content.getStyleClass().remove("unread");
+            if (!message.seen())
+                content.getStyleClass().add("unread");
+            setGraphic(content);
+        }
+    }
+}
