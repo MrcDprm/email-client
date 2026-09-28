@@ -49,6 +49,15 @@ public final class MailSender {
         Transport.send(message, account.email(), account.password());
     }
 
+    /** SMTP sunucusuna giriş yapıp çıkar; hesap kurulumunda bilgilerin doğruluğunu kontrol etmek için. */
+    public static void verify(MailAccount account) throws MessagingException {
+        try (Transport transport = MailSessions.smtpSession(account).getTransport("smtp")) {
+            transport.connect(account.email(), account.password());
+        }
+    }
+
+
+
     /**
      * Virgül ya da noktalı virgülle ayrılmış adresleri çözümler. Geçersiz bir adres varsa hangisi olduğunu
      * söyleyen bir hata fırlatır.

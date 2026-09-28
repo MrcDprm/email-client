@@ -1,0 +1,13 @@
+/* Uygulamanın ortak görünümü */
+.root {
+    -fx-font-size: 13px;
+}
+
+.error {
+    -fx-text-fill: #c62828;
+}
+
+.hint {
+    -fx-text-fill: #6b7280;
+    -fx-font-size: 11px;
+}
