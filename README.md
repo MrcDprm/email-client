@@ -136,15 +136,6 @@ ISCC installer\EmailClient.iss
 - **Styling JavaFX with CSS and a theme library.** I used AtlantaFX variables instead of hard-coded colors. I also found that the theme makes toolbar buttons flat, which hid my blue "New message" button once it lost focus, and fixed it with a more specific CSS rule.
 - **Testing without a real account.** GreenMail starts a real IMAP/SMTP server in memory, so the tests send, read, reply to and delete messages without ever touching my Gmail.
 
-## Future Plans
-
-- Viewing and saving attachments
-- Optional HTML view (with remote content blocked)
-- Multiple accounts
-- New-mail notifications (IMAP IDLE)
-- OAuth2 sign-in for Outlook / Hotmail and Gmail
-- Dark theme
-
 ## License
 
 [MIT](LICENSE) © 2026 Miraç Deprem
