@@ -134,15 +134,6 @@ ISCC installer\EmailClient.iss
 - **JavaFX'i CSS ve bir tema kütüphanesiyle biçimlendirmek.** Sabit renk kodları yerine AtlantaFX'in renk değişkenlerini kullandım. Temanın araç çubuğundaki düğmeleri düz gösterdiğini ve mavi "Yeni mesaj" düğmesini odak gidince görünmez yaptığını fark ettim; daha özgül bir CSS kuralıyla düzelttim.
 - **Gerçek hesap olmadan test etmek.** GreenMail bellekte gerçek bir IMAP/SMTP sunucusu açıyor; testler Gmail'ime hiç dokunmadan mesaj gönderiyor, okuyor, yanıtlıyor ve siliyor.
 
-## Gelecek Planları
-
-- Eklerin görüntülenmesi ve kaydedilmesi
-- İsteğe bağlı HTML görünümü (uzak içerik engellenmiş olarak)
-- Birden fazla hesap
-- Yeni e-posta bildirimi (IMAP IDLE)
-- Outlook / Hotmail ve Gmail için OAuth2 ile giriş
-- Koyu tema
-
 ## Lisans
 
 [MIT](LICENSE) © 2026 Miraç Deprem
