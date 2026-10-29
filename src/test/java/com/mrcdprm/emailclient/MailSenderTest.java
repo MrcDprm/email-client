@@ -71,6 +71,20 @@ class MailSenderTest {
         assertEquals(greenMail.getReceivedMessages()[0].getMessageID(), reply.getHeader("In-Reply-To")[0]);
     }
 
+    // Yanıtlanan mesajın kimliği dışarıdan gelir. Jakarta Mail'in setHeader metodu satır sonunu engellemez;
+    // temizlenmezse kimlik giden yanıta yeni bir başlık (Reply-To) ya da sahte bir gövde ekleyebilir.
+    @Test
+    void lineBreaksInTheRepliedIdCannotAddHeadersOrABody() throws Exception {
+        final String hostileId = "<a@test.local>\r\nReply-To: saldirgan@kotu.example\r\n\r\nSahte gövde";
+        MailSender.send(account(EMAIL, PASSWORD), new Draft("ayse@test.local", "", "Re: Soru", "Gerçek gövde", hostileId));
+
+        final MimeMessage reply = greenMail.getReceivedMessages()[0];
+        assertEquals(EMAIL, reply.getReplyTo()[0].toString());
+        assertEquals(1, reply.getHeader("In-Reply-To").length);
+        assertTrue(reply.getHeader("In-Reply-To")[0].indexOf('\n') < 0);
+        assertEquals("Gerçek gövde", ((String) reply.getContent()).strip());
+    }
+
     @Test
     void rejectsBadRecipients() {
         final MailAccount account = account(EMAIL, PASSWORD);
